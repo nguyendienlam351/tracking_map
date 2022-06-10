@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -12,7 +12,7 @@ import {
   Linking,
   Image
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, AnimatedRegion, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import Geolocation from 'react-native-geolocation-service';
 
@@ -20,6 +20,7 @@ import Geolocation from 'react-native-geolocation-service';
 const { width, height } = Dimensions.get('window')
 const MAP_KEY = "AIzaSyAQdw23mRj6Bz7Dy1noAEM6p2Sx0IYBr3E"
 const compassImage = require("./images/compass.png")
+const carImage = require("./images/car.png")
 const ASPECT_RATIO = width / height
 const LATITUDE_DELTA = 0.004
 const LONGITUDE_DELTA = LATITUDE_DELTA * ASPECT_RATIO
@@ -30,11 +31,23 @@ const App = () => {
       latitude: 0,
       longitude: 0,
     },
+    coordinate: new AnimatedRegion({
+      latitude: 0,
+      longitude: 0,
+      latitudeDelta: LATITUDE_DELTA,
+      longitudeDelta: LONGITUDE_DELTA
+    }),
+    heading: 0,
+  })
+
+  const [remain, setRemain] = useState({
     distance: 0, // Quảng đường còn lại
     duration: 0, // Thời gian còn lại
   })
-  const { curLoc, distance, duration } = location
+
+  const { curLoc, heading, coordinate } = location
   const [isFollowUser, setIsFollowUser] = useState(true)
+  const markerRef = useRef()
 
   // Vị trí kết thúc
   const [droplocationCords, setdroplocationCords] = useState({
@@ -93,6 +106,17 @@ const App = () => {
     )
   }
 
+  const animate = (latitude, longitude) => {
+    const newCoordinate = { latitude, longitude };
+    if (Platform.OS == 'android') {
+      if (markerRef.current) {
+        markerRef.current.animateMarkerToCoordinate(newCoordinate, 500);
+      }
+    } else {
+      coordinate.timing(newCoordinate).start();
+    }
+  }
+
   // Cập nhật vị trí hiện tại
   const getWatchPosition = () => {
     Geolocation.watchPosition(
@@ -101,10 +125,18 @@ const App = () => {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
         };
+        const heading = position.coords.heading
 
+        animate(cords.latitude, cords.longitude)
         setLocation({
-          ...location,
-          curLoc: cords
+          curLoc: cords,
+          heading: heading,
+          coordinate: new AnimatedRegion({
+            latitude: cords.latitude,
+            longitude: cords.longitude,
+            latitudeDelta: LATITUDE_DELTA,
+            longitudeDelta: LONGITUDE_DELTA
+          })
         })
       },
       error => {
@@ -169,7 +201,6 @@ const App = () => {
     <SafeAreaView style={styles.container}>
       <MapView
         style={StyleSheet.absoluteFill}
-        showsUserLocation={true}
         showsMyLocationButton={true}
         zoomControlEnabled={true}
         provider={PROVIDER_GOOGLE}
@@ -190,9 +221,22 @@ const App = () => {
           setDroplocation(coordinate)
         }}
       >
+        {/* Vị trí hiện tại */}
+        <Marker.Animated
+          ref={markerRef}
+          rotation={-15}
+          anchor={{ x: 0.5, y: 0.5 }}
+          coordinate={coordinate}
+          style={{
+            transform: [{ rotate: `${heading}deg` }]
+          }}
+        >
+          <Image source={carImage} style={[styles.image]} />
+        </Marker.Animated>
         {
           (droplocationCords.latitude !== 0 && droplocationCords.longitude !== 0) &&
           <>
+            {/* Vị trí đến */}
             <Marker
               coordinate={droplocationCords}
             />
@@ -202,12 +246,11 @@ const App = () => {
               destination={droplocationCords}
               apikey={MAP_KEY}
               strokeWidth={5}
-              strokeColor="skyblue"
+              strokeColor="#E85626"
               optimizeWaypoints={true}
               resetOnChange={false}
               onReady={({ distance, duration }) => {
-                setLocation({ // Cập nhật quảng đường và thời gian
-                  ...location,
+                setRemain({
                   distance: distance,
                   duration: duration
                 })
@@ -219,7 +262,7 @@ const App = () => {
 
       <View style={[styles.view, { top: 20, alignSelf: "center" }]}>
         <Text style={styles.text}>
-          {`Khoảng cách còn lại: ${distance.toFixed(1)} km\nThời gian còn lại: ${duration.toFixed(0)} phút`}
+          {`Khoảng cách còn lại: ${remain.distance.toFixed(1)} km\nThời gian còn lại: ${remain.duration.toFixed(0)} phút`}
         </Text>
       </View>
 
