@@ -85,6 +85,7 @@ const App = () => {
   const getCurrentPosition = () => {
     Geolocation.getCurrentPosition(
       position => {
+        //Tọa độ vị trí hiện tại
         const cords = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
@@ -106,7 +107,8 @@ const App = () => {
     )
   }
 
-  const animate = (latitude, longitude) => {
+  // animate của marker
+  const animateMarker = (latitude, longitude) => {
     const newCoordinate = { latitude, longitude };
     if (Platform.OS == 'android') {
       if (markerRef.current) {
@@ -121,13 +123,16 @@ const App = () => {
   const getWatchPosition = () => {
     Geolocation.watchPosition(
       position => {
+        // Tọa độ hiện tại
         const cords = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
-        };
+        }
+        // Hướng xoay hiện tại
         const heading = position.coords.heading
 
-        animate(cords.latitude, cords.longitude)
+        animateMarker(cords.latitude, cords.longitude)
+
         setLocation({
           curLoc: cords,
           heading: heading,
@@ -177,8 +182,11 @@ const App = () => {
     }
   }
 
-  // Chuyển sang google map
+  // Chuyển sang google map để chỉ đường
   const handleNavigateGoogleMap = async () => {
+    // origin: tọa độ điểm bắt đầu
+    // destination: tọa độ điểm kết thúc
+    // travelmode: phương thức di chuyển
     const url = "https://www.google.com/maps/dir/?api=1"
       + "&origin=" + curLoc.latitude + "," + curLoc.longitude
       + "&destination=" + droplocationCords.latitude + "," + droplocationCords.longitude
